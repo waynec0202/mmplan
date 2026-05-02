@@ -609,7 +609,7 @@ function setSyncStatus(state) {
 }
 
 // ── API + LocalStorage 雙層資料架構 ──
-const API_URL     = 'https://script.google.com/macros/s/AKfycby38wTDdYw0YpvOvrWHL--HNShXIStIv1H0gikz2LNF9aI-11dOd4WvhXZjL1Q0gcJ1/exec';
+const API_URL     = 'https://script.google.com/macros/s/AKfycbywLCY9XXd--C6hDLD5jQRmruCg_z9YdBt9_qvVL9Wnu35NCbQKJr2Te-TeDv-OK-vl/exec';
 const STORAGE_KEY = 'stock_trades_v1';
 const PRICE_KEY   = 'stock_market_prices_v1';
 
@@ -634,26 +634,41 @@ function getMarketPriceUpdated(code) {
   return d.toLocaleDateString('zh-TW') + ' ' + d.toLocaleTimeString('zh-TW', {hour:'2-digit',minute:'2-digit'});
 }
 
-// ── API 呼叫 ──
+// ── API 呼叫（JSONP for GET, fetch no-cors for POST）──
 function jsonp(url) {
   return new Promise((resolve, reject) => {
     const cb = 'cb_' + Date.now() + '_' + Math.floor(Math.random()*9999);
     const s  = document.createElement('script');
-    const t  = setTimeout(() => { cleanup(); reject(new Error('timeout')); }, 15000);
-    function cleanup() { clearTimeout(t); delete window[cb]; s.parentNode&&s.parentNode.removeChild(s); }
+    const t  = setTimeout(() => {
+      cleanup();
+      reject(new Error('連線逾時，請確認 Apps Script 已部署且存取對象為「所有人」'));
+    }, 12000);
+    function cleanup() {
+      clearTimeout(t);
+      if (window[cb]) delete window[cb];
+      if (s.parentNode) s.parentNode.removeChild(s);
+    }
     window[cb] = data => { cleanup(); resolve(data); };
-    s.onerror  = () => { cleanup(); reject(new Error('script error')); };
-    s.src = API_URL + '?callback=' + cb + '&t=' + Date.now();
+    s.onerror  = () => { cleanup(); reject(new Error('Script 載入失敗')); };
+    // Add random param to avoid cache
+    s.src = url + '?callback=' + cb + '&_=' + Date.now();
     document.head.appendChild(s);
   });
 }
+
 async function apiPost(payload) {
-  const res = await fetch(API_URL, {
-    method: 'POST',
-    mode:   'no-cors',
-    body:   JSON.stringify(payload),
-  });
-  return res;
+  // Apps Script POST with no-cors (fire and forget)
+  try {
+    await fetch(API_URL, {
+      method:  'POST',
+      mode:    'no-cors',
+      headers: { 'Content-Type': 'text/plain' },
+      body:    JSON.stringify(payload),
+    });
+  } catch(e) {
+    console.warn('apiPost failed:', e);
+    throw e;
+  }
 }
 
 // ── 本地備份（離線時使用）──
