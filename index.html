@@ -145,6 +145,24 @@
   .alloc-zone.compact .zone-pct   { font-size: clamp(22px, 3.5vw, 38px) !important; }
   .alloc-zone.compact .zone-amount { font-size: 11px; }
   .zone-right { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; z-index: 1; }
+  .zone-note {
+    margin-top: 4px;
+    width: 100%;
+    max-width: 140px;
+    text-align: right;
+    font-size: 11px;
+    font-family: 'Noto Sans TC', sans-serif;
+    background: transparent;
+    border: none;
+    border-bottom: 1px dashed rgba(0,0,0,0.15);
+    outline: none;
+    color: var(--text2);
+    padding: 2px 0;
+    cursor: text;
+    transition: border-color 0.2s;
+  }
+  .zone-note:focus { border-bottom-color: rgba(0,0,0,0.4); }
+  .zone-note::placeholder { color: rgba(0,0,0,0.2); font-style: italic; }
   .zone-pct {
     font-family: 'JetBrains Mono', monospace; font-weight: 700;
     font-size: clamp(36px, 5.5vw, 72px); letter-spacing: -0.04em; line-height: 1;
@@ -406,6 +424,9 @@
         <div class="zone-right">
           <div class="zone-pct" id="zone-high-pct">—</div>
           <div class="zone-amount" id="zone-high-amt">$0</div>
+          <input class="zone-note" id="zone-high-note" placeholder="備註..." maxlength="20"
+            value="" oninput="saveZoneNote('high',this.value)"
+            onclick="event.stopPropagation()" />
         </div>
       </div>
       <div class="alloc-zone mid-risk" id="zone-mid" style="flex:30">
@@ -417,6 +438,9 @@
         <div class="zone-right">
           <div class="zone-pct" id="zone-mid-pct">—</div>
           <div class="zone-amount" id="zone-mid-amt">$0</div>
+          <input class="zone-note" id="zone-mid-note" placeholder="備註..." maxlength="20"
+            value="" oninput="saveZoneNote('mid',this.value)"
+            onclick="event.stopPropagation()" />
         </div>
       </div>
       <div class="alloc-zone base-zone" id="zone-base" style="flex:30">
@@ -430,6 +454,9 @@
           <div class="zone-pct" id="zone-base-pct">—</div>
           <div class="zone-amount" id="zone-base-amt">$0</div>
           <div id="zone-base-pnl" style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;margin-top:4px;text-align:right;"></div>
+          <input class="zone-note" id="zone-base-note" placeholder="備註..." maxlength="20"
+            value="" oninput="saveZoneNote('base',this.value)"
+            onclick="event.stopPropagation()" />
         </div>
       </div>
     </div>
@@ -862,6 +889,7 @@ function renderAllocationBlock() {
     highCount > 0 ? highCount + ' 檔高風險持股，成本 ' + fmtW(highCost) : '目前無高風險持股';
   document.getElementById('zone-mid-sub').textContent =
     midCount > 0 ? midCount + ' 檔中風險持股，成本 ' + fmtW(midCost) : '目前無中風險持股';
+  loadZoneNotes();
 
   // Realized PnL in base zone
   const pnl = calcRealizedPnl();
@@ -1614,6 +1642,18 @@ function savePnlInit() {
   closePnlModal();
   renderOverview();
   toast('✓ 已實現損益初始值已儲存');
+}
+
+// ── Zone 備註 ──
+function saveZoneNote(key, val) {
+  localStorage.setItem('zone_note_' + key, val);
+}
+function loadZoneNotes() {
+  ['high','mid','base'].forEach(k => {
+    const el  = document.getElementById('zone-' + k + '-note');
+    const val = localStorage.getItem('zone_note_' + k) || '';
+    if (el) el.value = val;
+  });
 }
 
 // Init
