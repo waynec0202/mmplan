@@ -1182,13 +1182,34 @@ function addTrade() {
 }
 
 function deleteTrade(id) {
-  if (!confirm('確定刪除此筆記錄？')) return;
+  const t = trades.find(t => t.id === id);
+  if (!t) return;
+
+  const label = t.action === 'buy' ? '買入' : '賣出';
+  const total = t.price * t.qty;
+  const net   = t.action === 'buy' ? total + (t.fee||0) : total - (t.fee||0);
+
+  if (!confirm(`確定刪除此筆記錄？\n${t.name} ${label} ${t.qty.toLocaleString()} 股 × $${t.price}\n\n銀行存款將自動反向調整：${t.action==='buy'?'退回':'扣回'} $${Math.round(net).toLocaleString()}`)) return;
+
+  // 反向調整存款：買入刪除 → 退回金額；賣出刪除 → 扣回金額
+  if (t.action === 'buy') {
+    bankBalance += net; // 退回買入金額
+  } else {
+    bankBalance = Math.max(0, bankBalance - net); // 扣回賣出回款
+  }
+  localStorage.setItem('bankBalance', bankBalance);
+  updateBankDisplay();
+
   trades = trades.filter(t => t.id !== id);
   saveLocal();
   renderAll();
   setSyncStatus('loading');
   apiPost({ action:'delete', id })
-    .then(()=>{ setSyncStatus('ok'); toast('✓ 已刪除並同步'); })
+    .then(()=>{
+      apiPost({ action:'setBank', balance: bankBalance });
+      setSyncStatus('ok');
+      toast('✓ 已刪除，存款已調整');
+    })
     .catch(()=>{ setSyncStatus('error'); toast('本地已刪除，雲端同步失敗', 'error'); });
 }
 
