@@ -582,7 +582,7 @@
 <div class="modal-overlay" id="bank-modal">
   <div class="modal" style="width:360px;">
     <h3>修改銀行存款</h3>
-    <p>直接輸入目前存款總額，買入股票時自動扣款。</p>
+    <p>輸入你的<strong>初始資金</strong>（開始使用此系統前的資金總額）。之後每筆買賣交易都會自動計算，存款永遠準確。</p>
     <div class="field">
       <label>銀行存款金額（元）</label>
       <input type="number" id="bank-input" placeholder="例：1000000" min="0" />
@@ -676,7 +676,25 @@
 <script>
 let trades = [];
 let pnlChartInst, monthChartInst;
-let bankBalance = parseFloat(localStorage.getItem('bankBalance') || '0');
+// ── 銀行存款：從交易記錄即時計算 ──
+// initialBalance = 使用者手動設定的「初始資金」（系統使用前的錢）
+// bankBalance    = initialBalance - 所有買入淨額 + 所有賣出淨額（即時計算）
+let initialBalance = parseFloat(localStorage.getItem('initialBalance') || '0');
+
+function calcBankBalance() {
+  let balance = initialBalance;
+  trades.forEach(t => {
+    const net = t.action === 'buy'
+      ? (t.price * t.qty) + (parseFloat(t.fee) || 0)   // 買入：付出
+      : (t.price * t.qty) - (parseFloat(t.fee) || 0);  // 賣出：收回
+    if (t.action === 'buy')  balance -= net;
+    else                     balance += net;
+  });
+  return Math.round(balance);
+}
+
+// 動態 getter，永遠從交易記錄計算
+Object.defineProperty(window, 'bankBalance', { get: calcBankBalance });
 
 function fmt(n) { return '$' + Math.round(n).toLocaleString(); }
 // 總覽頁面專用：以「萬」為單位
@@ -771,7 +789,7 @@ async function apiPost(payload) {
 function saveLocal() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(trades));
-    localStorage.setItem('bankBalance',  bankBalance);
+    localStorage.setItem('initialBalance', initialBalance);
   } catch(e) {}
 }
 function loadLocal() {
@@ -785,10 +803,10 @@ function loadLocal() {
 
 // ── Bank ──
 function updateBankDisplay() {
-  document.getElementById('bank-display').textContent = fmt(bankBalance);
+  document.getElementById('bank-display').textContent = fmt(calcBankBalance());
 }
 function openBankModal() {
-  document.getElementById('bank-input').value = bankBalance || '';
+  document.getElementById('bank-input').value = initialBalance || '';
   document.getElementById('bank-modal').classList.add('show');
   setTimeout(() => document.getElementById('bank-input').focus(), 150);
 }
@@ -801,14 +819,14 @@ document.getElementById('bank-modal').addEventListener('click', e => {
 function saveBankBalance() {
   const val = parseFloat(document.getElementById('bank-input').value);
   if (isNaN(val) || val < 0) { toast('請輸入有效金額', 'error'); return; }
-  bankBalance = val;
-  localStorage.setItem('bankBalance', bankBalance);
+  initialBalance = val;
+  localStorage.setItem('initialBalance', initialBalance);
   updateBankDisplay();
   renderOverview();
   renderAllocationBlock();
   closeBankModal();
-  toast('✓ 存款已更新');
-  apiPost({ action:'setBank', balance: bankBalance }).catch(()=>{});
+  toast('✓ 初始資金已設定，存款已重新計算');
+  apiPost({ action:'setBank', balance: initialBalance }).catch(()=>{});
 }
 
 // ── Asset Allocation (auto-calculated from holdings + bankBalance) ──
@@ -1054,8 +1072,8 @@ async function loadTrades() {
         fee:   parseFloat(t.fee)||0,
       }));
       if (typeof json.bankBalance === 'number' && json.bankBalance > 0) {
-        bankBalance = json.bankBalance;
-        localStorage.setItem('bankBalance', bankBalance);
+        initialBalance = json.bankBalance;
+        localStorage.setItem('initialBalance', initialBalance);
         updateBankDisplay();
       }
       if (json.prices) {
@@ -1063,6 +1081,18 @@ async function loadTrades() {
           marketPrices[code] = val;
         });
         saveMarketPrices();
+      }
+      // 同步 pnlInit
+      if (typeof json.pnlInit === 'number') {
+        localStorage.setItem('pnlInitValue', json.pnlInit);
+      }
+      // 同步 zoneNotes
+      if (json.zoneNotes) {
+        ['high','mid','base'].forEach(k => {
+          if (json.zoneNotes[k] !== undefined) {
+            localStorage.setItem('zone_note_' + k, json.zoneNotes[k]);
+          }
+        });
       }
       saveLocal();
       setSyncStatus('ok');
@@ -1083,8 +1113,8 @@ async function loadTrades() {
           fee:   parseFloat(t.fee)||0,
         }));
         if (typeof json.bankBalance === 'number' && json.bankBalance > 0) {
-          bankBalance = json.bankBalance;
-          localStorage.setItem('bankBalance', bankBalance);
+          initialBalance = json.bankBalance;
+          localStorage.setItem('initialBalance', initialBalance);
           updateBankDisplay();
         }
         if (json.prices) {
@@ -1092,6 +1122,16 @@ async function loadTrades() {
             marketPrices[code] = val;
           });
           saveMarketPrices();
+        }
+        if (typeof json.pnlInit === 'number') {
+          localStorage.setItem('pnlInitValue', json.pnlInit);
+        }
+        if (json.zoneNotes) {
+          ['high','mid','base'].forEach(k => {
+            if (json.zoneNotes[k] !== undefined) {
+              localStorage.setItem('zone_note_' + k, json.zoneNotes[k]);
+            }
+          });
         }
         saveLocal();
         setSyncStatus('ok');
@@ -1154,19 +1194,12 @@ function addTrade() {
   if (!code||!name||!date||isNaN(price)||isNaN(qty)) {
     toast('請填寫必要欄位：代號、名稱、日期、價格、股數','error'); return;
   }
-  // 買入：總金額 + 手續費；賣出：總金額 - 手續費
   const total    = price * qty;
   const netTotal = action === 'buy' ? total + fee : total - fee;
-  if (action==='buy') {
-    if (bankBalance < netTotal) {
-      if (!confirm('銀行存款不足！\n目前存款：'+fmt(bankBalance)+'\n購買金額：'+fmt(netTotal)+'\n\n仍要繼續新增記錄？')) return;
-    }
-    bankBalance = Math.max(0, bankBalance - netTotal);
-  } else {
-    bankBalance += netTotal;
+  // 買入時檢查餘額是否足夠（存款從交易自動計算，不需手動扣）
+  if (action === 'buy' && calcBankBalance() < netTotal) {
+    if (!confirm('銀行存款不足！\n目前存款：'+fmt(calcBankBalance())+'\n購買金額：'+fmt(netTotal)+'\n\n仍要繼續新增記錄？')) return;
   }
-  localStorage.setItem('bankBalance', bankBalance);
-  updateBankDisplay();
 
   const trade = { id:Date.now(), code, name, action, date, price, qty, fee, note, risk };
   trades.push(trade);
@@ -1178,38 +1211,21 @@ function addTrade() {
   apiPost({ action:'add', trade })
     .then(()=>{ setSyncStatus('ok'); toast('✓ 已同步至 Google Sheets'); })
     .catch(()=>{ setSyncStatus('error'); toast('本地已儲存，雲端同步失敗', 'error'); });
-  apiPost({ action:'setBank', balance: bankBalance }).catch(()=>{});
 }
 
 function deleteTrade(id) {
   const t = trades.find(t => t.id === id);
   if (!t) return;
-
   const label = t.action === 'buy' ? '買入' : '賣出';
-  const total = t.price * t.qty;
-  const net   = t.action === 'buy' ? total + (t.fee||0) : total - (t.fee||0);
+  if (!confirm('確定刪除此筆記錄？\n' + t.name + ' ' + label + ' ' + t.qty.toLocaleString() + ' 股 × $' + t.price + '\n\n存款將自動重新計算')) return;
 
-  if (!confirm(`確定刪除此筆記錄？\n${t.name} ${label} ${t.qty.toLocaleString()} 股 × $${t.price}\n\n銀行存款將自動反向調整：${t.action==='buy'?'退回':'扣回'} $${Math.round(net).toLocaleString()}`)) return;
-
-  // 反向調整存款：買入刪除 → 退回金額；賣出刪除 → 扣回金額
-  if (t.action === 'buy') {
-    bankBalance += net; // 退回買入金額
-  } else {
-    bankBalance = Math.max(0, bankBalance - net); // 扣回賣出回款
-  }
-  localStorage.setItem('bankBalance', bankBalance);
-  updateBankDisplay();
-
-  trades = trades.filter(t => t.id !== id);
+  trades = trades.filter(tr => tr.id !== id);
   saveLocal();
+  updateBankDisplay();
   renderAll();
   setSyncStatus('loading');
   apiPost({ action:'delete', id })
-    .then(()=>{
-      apiPost({ action:'setBank', balance: bankBalance });
-      setSyncStatus('ok');
-      toast('✓ 已刪除，存款已調整');
-    })
+    .then(()=>{ setSyncStatus('ok'); toast('✓ 已刪除，存款自動重算'); })
     .catch(()=>{ setSyncStatus('error'); toast('本地已刪除，雲端同步失敗', 'error'); });
 }
 
@@ -1625,6 +1641,7 @@ function saveEdit() {
   if (idx === -1) { toast('找不到該筆記錄', 'error'); return; }
   trades[idx] = { ...trades[idx], code, name, action, risk, date, price, qty, fee, note };
   saveLocal();
+  updateBankDisplay(); // 重算存款
   closeEditModal();
   renderAll();
   setSyncStatus('loading');
@@ -1666,11 +1683,13 @@ function savePnlInit() {
   closePnlModal();
   renderOverview();
   toast('✓ 已實現損益初始值已儲存');
+  apiPost({ action:'setSetting', key:'pnlInit', value: val }).catch(()=>{});
 }
 
 // ── Zone 備註 ──
 function saveZoneNote(key, val) {
   localStorage.setItem('zone_note_' + key, val);
+  apiPost({ action:'setSetting', key:'zoneNote_' + key, value: val }).catch(()=>{});
 }
 function loadZoneNotes() {
   ['high','mid','base'].forEach(k => {
