@@ -1012,12 +1012,13 @@ function updateTradePreview() {
   const preview = document.getElementById('trade-preview');
   if (!price || !qty) { preview.classList.add('hidden'); return; }
   preview.classList.remove('hidden');
-  const total = price * qty + fee;
-  const isBuy = action === 'buy';
-  document.getElementById('preview-label').textContent = isBuy ? '購買總金額（含手續費）' : '賣出回收金額';
-  document.getElementById('preview-amount').textContent = fmt(total);
+  const total    = price * qty;
+  const netTotal = action === 'buy' ? total + fee : total - fee;
+  const isBuy    = action === 'buy';
+  document.getElementById('preview-label').textContent = isBuy ? '購買總金額（含手續費）' : '賣出回收金額（扣手續費）';
+  document.getElementById('preview-amount').textContent = fmt(netTotal);
   if (isBuy) {
-    const after = bankBalance - total;
+    const after = bankBalance - netTotal;
     if (after < 0) {
       preview.className = 'trade-preview insufficient';
       document.getElementById('preview-balance').textContent = '存款不足！尚缺 ' + fmt(Math.abs(after));
@@ -1029,7 +1030,7 @@ function updateTradePreview() {
     }
   } else {
     preview.className = 'trade-preview sell-mode';
-    document.getElementById('preview-balance').textContent = '賣出後存款增加：+' + fmt(total);
+    document.getElementById('preview-balance').textContent = '賣出後存款增加：+' + fmt(netTotal);
     document.getElementById('preview-status').innerHTML = '<span style="color:var(--blue)">↑ 回收資金</span>';
   }
 }
@@ -1153,14 +1154,16 @@ function addTrade() {
   if (!code||!name||!date||isNaN(price)||isNaN(qty)) {
     toast('請填寫必要欄位：代號、名稱、日期、價格、股數','error'); return;
   }
-  const total = price * qty + fee;
+  // 買入：總金額 + 手續費；賣出：總金額 - 手續費
+  const total    = price * qty;
+  const netTotal = action === 'buy' ? total + fee : total - fee;
   if (action==='buy') {
-    if (bankBalance < total) {
-      if (!confirm('銀行存款不足！\n目前存款：'+fmt(bankBalance)+'\n購買金額：'+fmt(total)+'\n\n仍要繼續新增記錄？')) return;
+    if (bankBalance < netTotal) {
+      if (!confirm('銀行存款不足！\n目前存款：'+fmt(bankBalance)+'\n購買金額：'+fmt(netTotal)+'\n\n仍要繼續新增記錄？')) return;
     }
-    bankBalance = Math.max(0, bankBalance - total);
+    bankBalance = Math.max(0, bankBalance - netTotal);
   } else {
-    bankBalance += total;
+    bankBalance += netTotal;
   }
   localStorage.setItem('bankBalance', bankBalance);
   updateBankDisplay();
