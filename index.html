@@ -85,7 +85,7 @@
     border: 0.5px solid var(--border-strong);
     display: flex;
     flex-direction: column;
-    height: 480px;
+    height: 540px;
     margin-bottom: 1rem;
   }
   .alloc-zone {
@@ -139,8 +139,11 @@
   .mid-risk .zone-title { color: #0C3570; }
   .base-zone .zone-title { color: #0A5A3F; }
   .zone-sub { font-size: 12px; color: var(--text3); }
-  .alloc-zone.compact .zone-title { display: none; }
-  .alloc-zone.compact .zone-sub   { display: none; }
+  .alloc-zone.compact .zone-title { font-size: 11px; }
+  .alloc-zone.compact .zone-sub   { font-size: 10px; }
+  .alloc-zone.compact .zone-tag   { font-size: 9px; padding: 2px 7px; }
+  .alloc-zone.compact .zone-pct   { font-size: clamp(22px, 3.5vw, 38px) !important; }
+  .alloc-zone.compact .zone-amount { font-size: 11px; }
   .zone-right { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; z-index: 1; }
   .zone-pct {
     font-family: 'JetBrains Mono', monospace; font-weight: 700;
@@ -156,15 +159,14 @@
   /* ── Overview Hero ── */
   .overview-hero {
     text-align: center;
-    padding: 2rem 1rem 1.25rem;
     background: var(--surface);
     border: 0.5px solid var(--border);
     border-radius: var(--radius);
     margin-bottom: 10px;
   }
-  .hero-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text3); font-weight: 500; margin-bottom: 8px; }
-  .hero-value { font-size: clamp(36px, 8vw, 56px); font-weight: 700; font-family: 'JetBrains Mono', monospace; letter-spacing: -0.04em; color: var(--text); line-height: 1; margin-bottom: 8px; }
-  .hero-sub { font-size: 12px; color: var(--text3); }
+  .hero-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text3); font-weight: 500; margin-bottom: 4px; }
+  .hero-value { font-size: clamp(26px, 5vw, 40px); font-weight: 700; font-family: 'JetBrains Mono', monospace; letter-spacing: -0.04em; color: var(--text); line-height: 1; margin-bottom: 4px; }
+  .hero-sub { font-size: 11px; color: var(--text3); }
 
   /* ── Overview Trio ── */
   .overview-trio {
@@ -276,7 +278,7 @@
     .overview-hero > div {
       border-right: none !important;
       border-bottom: 0.5px solid var(--border);
-      padding: 1rem 1.25rem !important;
+      padding: 0.625rem 1rem !important;
     }
     .overview-hero > div:last-child { border-bottom: none; }
     .hero-value { font-size: 28px !important; }
@@ -296,7 +298,7 @@
     .overview-grid, .grid-2 { grid-template-columns: 1fr; }
 
     /* ── 資產配置 ── */
-    .alloc-block { height: 360px; }
+    .alloc-block { height: 420px; }
     .alloc-zone { padding: 0 1rem; }
     .zone-title { font-size: 13px; }
     .zone-tag { font-size: 9px; padding: 3px 7px; }
@@ -371,19 +373,19 @@
     <!-- 總資產 | 未實現損益 | 已實現損益 三欄 -->
     <div class="overview-hero" style="display:flex;align-items:stretch;text-align:left;padding:0;overflow:hidden;">
       <!-- 總資產 -->
-      <div style="flex:1.5;padding:1.5rem 1.75rem;border-right:0.5px solid var(--border);">
+      <div style="flex:1.5;padding:0.75rem 1.25rem;border-right:0.5px solid var(--border);">
         <div class="hero-label">總資產</div>
         <div class="hero-value" id="hero-total">$0</div>
         <div class="hero-sub" id="hero-sub">持倉市值＋銀行存款</div>
       </div>
       <!-- 未實現損益 -->
-      <div style="flex:1;padding:1.5rem 1.25rem;border-right:0.5px solid var(--border);display:flex;flex-direction:column;justify-content:center;">
+      <div style="flex:1;padding:0.75rem 1rem;border-right:0.5px solid var(--border);display:flex;flex-direction:column;justify-content:center;">
         <div class="hero-label">未實現損益</div>
         <div class="hero-value" id="hero-unrealized" style="font-size:clamp(20px,4vw,36px);">—</div>
         <div class="hero-sub" id="hero-unrealized-sub">持倉市值變動</div>
       </div>
       <!-- 已實現損益 -->
-      <div style="flex:1;padding:1.5rem 1.25rem;display:flex;flex-direction:column;justify-content:center;">
+      <div style="flex:1;padding:0.75rem 1rem;display:flex;flex-direction:column;justify-content:center;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;">
           <div class="hero-label">已實現損益</div>
           <button onclick="openPnlModal()" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--blue);font-family:'Noto Sans TC',sans-serif;padding:0;">＋初始值</button>
