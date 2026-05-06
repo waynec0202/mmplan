@@ -926,8 +926,6 @@ function renderAllocationBlock() {
     highCount > 0 ? highCount + ' 檔高風險持股，成本 ' + fmtW(highCost) : '目前無高風險持股';
   document.getElementById('zone-mid-sub').textContent =
     midCount > 0 ? midCount + ' 檔中風險持股，成本 ' + fmtW(midCost) : '目前無中風險持股';
-  loadZoneNotes();
-
   // Realized PnL in base zone
   const pnl = calcRealizedPnl();
   const pnlEl = document.getElementById('zone-base-pnl');
@@ -943,6 +941,9 @@ function renderAllocationBlock() {
     pnlSubEl.textContent = '尚無已實現損益';
     pnlSubEl.style.color = 'var(--text3)';
   }
+
+  // 最後再設定備註（確保不被其他渲染蓋掉）
+  setTimeout(loadZoneNotes, 0);
 }
 
 // ── Trade Preview ──
@@ -1116,6 +1117,8 @@ async function loadTrades() {
       saveLocal();
       setSyncStatus('ok');
       hideConnectionError();
+      // 立即更新備註欄（在 renderAll 之後）
+      setTimeout(loadZoneNotes, 50);
     } else {
       throw new Error(json.message || 'invalid response');
     }
@@ -1155,6 +1158,7 @@ async function loadTrades() {
         saveLocal();
         setSyncStatus('ok');
         hideConnectionError();
+        setTimeout(loadZoneNotes, 50);
         renderAll();
         return;
       }
@@ -1710,14 +1714,20 @@ function saveZoneNote(key, val) {
   localStorage.setItem('zone_note_' + key, val);
   clearTimeout(window['_zoneTimer_' + key]);
   window['_zoneTimer_' + key] = setTimeout(() => {
-    apiGetAction('setSetting', { key: 'zoneNote_' + key, value: val });
+    const label = { high:'高風險', mid:'中風險', base:'基石' }[key] || key;
+    apiGetAction('setSetting', { key: 'zoneNote_' + key, value: val })
+      .then(() => toast('✓ ' + label + ' 備註已同步'))
+      .catch(() => toast('⚠ ' + label + ' 備註同步失敗', 'error'));
   }, 1000);
 }
 function loadZoneNotes() {
   ['high','mid','base'].forEach(k => {
     const el  = document.getElementById('zone-' + k + '-note');
     const val = localStorage.getItem('zone_note_' + k) || '';
-    if (el) el.value = val;
+    if (el) {
+      el.value = val;
+      el.setAttribute('data-loaded', '1');
+    }
   });
 }
 
