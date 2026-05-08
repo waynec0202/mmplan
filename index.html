@@ -1423,13 +1423,33 @@ function renderHoldings() {
   const cont=document.getElementById('holdings-table');
   if (!vals.length){cont.innerHTML='<div class="empty">目前無持倉</div>';return;}
 
+  // 取得每檔股票的風險類別
+  function getHoldingRisk(h) {
+    const st = trades.filter(t=>t.code===h.code&&t.action==='buy');
+    return st.length ? (st[st.length-1].risk||'high') : 'high';
+  }
+
+  // 依風險排序：高風險在上，中風險在下，同類別按持倉成本降序
+  const sorted = [...vals].sort((a,b)=>{
+    const ra = getHoldingRisk(a), rb = getHoldingRisk(b);
+    if (ra !== rb) return ra==='high' ? -1 : 1;
+    return b.cost - a.cost;
+  });
+
+  // 找出分組邊界（高風險→中風險的切換點）
+  const firstMidIdx = sorted.findIndex(h => getHoldingRisk(h) === 'mid');
+
+  const riskTag = (risk) => risk === 'mid'
+    ? `<span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:600;padding:2px 7px;border-radius:20px;background:var(--blue-bg);color:var(--mid-risk);">📊 中風險</span>`
+    : `<span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:600;padding:2px 7px;border-radius:20px;background:var(--red-bg);color:var(--high-risk);">🔥 高風險</span>`;
+
   cont.innerHTML=`
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
     <span style="font-size:12px;color:var(--text3);">點擊市價欄可手動修改，或點「更新全部報價」自動抓取</span>
     <button class="btn btn-sm" onclick="fetchAllMarketPrices()" id="fetch-all-btn" style="color:var(--blue);border-color:rgba(24,95,165,0.3);">⟳ 更新全部報價</button>
   </div>
   <table><thead><tr>
-    <th>代號</th><th>名稱</th>
+    <th>風險</th><th>代號</th><th>名稱</th>
     <th class="text-right">股數</th>
     <th class="text-right">均買價</th>
     <th class="text-right">即時市價</th>
@@ -1437,14 +1457,22 @@ function renderHoldings() {
     <th class="text-right">持倉成本</th>
     <th>占比</th>
   </tr></thead>
-  <tbody>${vals.map(h=>{
+  <tbody>${sorted.map((h,idx)=>{
+    const risk=getHoldingRisk(h);
     const pct=totalCost?Math.round(h.cost/totalCost*100):0;
     const mp=getMarketPrice(h.code);
     const upd=getMarketPriceUpdated(h.code);
     const unrealized=mp?(mp-h.avgPrice)*h.qty:null;
     const upPct=mp?((mp-h.avgPrice)/h.avgPrice*100):null;
     const isUp=unrealized>=0;
-    return `<tr>
+    // 在中風險第一筆前加分隔線
+    const divider = (idx===firstMidIdx && firstMidIdx>0)
+      ? `<tr><td colspan="9" style="padding:4px 0;background:transparent;">
+           <div style="border-top:1.5px dashed rgba(24,95,165,0.25);margin:2px 0;"></div>
+         </td></tr>`
+      : '';
+    return divider + `<tr style="background:${risk==='high'?'rgba(216,90,48,0.02)':'rgba(24,95,165,0.02)'};">
+    <td>${riskTag(risk)}</td>
     <td class="mono" style="font-weight:600">${h.code}</td>
     <td>${h.name}</td>
     <td class="text-right mono">${h.qty.toLocaleString()}</td>
@@ -1470,7 +1498,7 @@ function renderHoldings() {
     <td class="text-right mono" style="font-weight:500;">$${Math.round(h.cost).toLocaleString()}</td>
     <td style="min-width:72px">
       <div style="font-size:11px;color:var(--text3);margin-bottom:3px">${pct}%</div>
-      <div class="pnl-bar-wrap"><div class="pnl-bar" style="width:${pct}%;background:${(h.risk||'high')==='mid'?'var(--mid-risk)':'var(--high-risk)'}"></div></div>
+      <div class="pnl-bar-wrap"><div class="pnl-bar" style="width:${pct}%;background:${risk==='mid'?'var(--mid-risk)':'var(--high-risk)'}"></div></div>
     </td>
   </tr>`;}).join('')}</tbody></table>`;
 }
