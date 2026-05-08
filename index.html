@@ -943,7 +943,7 @@ function renderAllocationBlock() {
   }
 
   // 最後再設定備註（確保不被其他渲染蓋掉）
-  setTimeout(loadZoneNotes, 0);
+  setTimeout(loadZoneNotes, 10);
 }
 
 // ── Trade Preview ──
@@ -1106,18 +1106,18 @@ async function loadTrades() {
       if (typeof json.pnlInit === 'number') {
         localStorage.setItem('pnlInitValue', json.pnlInit);
       }
-      // 同步 zoneNotes
+      // 同步 zoneNotes（只在有值時覆蓋本地）
       if (json.zoneNotes) {
         ['high','mid','base'].forEach(k => {
-          if (json.zoneNotes[k] !== undefined) {
-            localStorage.setItem('zone_note_' + k, json.zoneNotes[k]);
+          const v = json.zoneNotes[k];
+          if (v !== undefined && v !== null && v !== '') {
+            localStorage.setItem('zone_note_' + k, v);
           }
         });
       }
       saveLocal();
       setSyncStatus('ok');
       hideConnectionError();
-      // 立即更新備註欄（在 renderAll 之後）
       setTimeout(loadZoneNotes, 50);
     } else {
       throw new Error(json.message || 'invalid response');
@@ -1150,8 +1150,9 @@ async function loadTrades() {
         }
         if (json.zoneNotes) {
           ['high','mid','base'].forEach(k => {
-            if (json.zoneNotes[k] !== undefined) {
-              localStorage.setItem('zone_note_' + k, json.zoneNotes[k]);
+            const v = json.zoneNotes[k];
+            if (v !== undefined && v !== null && v !== '') {
+              localStorage.setItem('zone_note_' + k, v);
             }
           });
         }
